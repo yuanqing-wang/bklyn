@@ -119,7 +119,7 @@ def graph_exp(graph):
 class ExactBklynModel(ExactGP):
     def __init__(
             self, train_x, train_y, likelihood, num_classes, 
-            features, graph, in_features, hidden_features, t, gamma, log_sigma,
+            features, graph, in_features, hidden_features, t, gamma,
             activation,
         ):
         super().__init__(train_x, train_y, likelihood)
@@ -128,7 +128,7 @@ class ExactBklynModel(ExactGP):
             batch_shape=torch.Size((num_classes,)),
         )
 
-        self.covar_module = ScaleKernel(GaussianSymmetrizedKLKernel())
+        self.covar_module = LinearKernel()
         self.rewire = Rewire(
             hidden_features, hidden_features, t=t, gamma=gamma,
         )
@@ -138,20 +138,16 @@ class ExactBklynModel(ExactGP):
         self.graph = graph
         self.fc = torch.nn.Linear(in_features, hidden_features, bias=False)
         self.norm = torch.nn.LayerNorm(hidden_features)
-        self.log_sigma = torch.nn.Parameter(torch.tensor(log_sigma))
         self.activation = activation
+        # self.activation = gpytorch.utils.grid.ScaleToBounds(-1.0, 1.0)
 
     def forward(self, x):
         h = self.fc(self.features)
+        # h = self.activation(h)
         h = self.norm(h)
-        h = self.activation(h)
-        a = self.rewire(h, self.graph)
+        h = self.rewire(h, self.graph)
         mean = self.mean_module(h)
         covar = self.covar_module(h)
-        covar = a @ covar @ a.t()
-        covar = covar \
-        + self.log_sigma.exp() \
-        * torch.eye(covar.shape[-1], dtype=covar.dtype, device=covar.device)
         x = x.squeeze().long()
         mean = mean[..., x]
         covar = covar[..., x, :][..., :, x]
@@ -169,7 +165,6 @@ class ApproximateBklynModel(ApproximateGP):
             learn_inducing_locations: bool = False,
             t: float=1.0,
             gamma: float=-1.0,
-            log_sigma: float=0.0,
             activation: Callable=torch.nn.functional.silu,
     ):
 
@@ -197,7 +192,6 @@ class ApproximateBklynModel(ApproximateGP):
         )
 
         self.covar_module = LinearKernel()
-
         self.rewire = Rewire(
             hidden_features, hidden_features, t=t,
         )
@@ -205,9 +199,7 @@ class ApproximateBklynModel(ApproximateGP):
         self.register_buffer("features", features)
         self.graph = graph
         self.fc = torch.nn.Linear(in_features, hidden_features, bias=False)
-        self.register_buffer("log_sigma", torch.tensor(log_sigma))
         self.activation = activation
-
 
     def forward(self, x):
         h = self.fc(self.features)
@@ -215,9 +207,6 @@ class ApproximateBklynModel(ApproximateGP):
         h = self.rewire(h, self.graph)
         mean = self.mean_module(h)
         covar = self.covar_module(h)
-        covar = covar \
-        + self.log_sigma.exp() \
-        * torch.eye(covar.shape[-1], dtype=covar.dtype, device=covar.device)
         x = x.squeeze().long()
         mean = mean[..., x]
         covar = covar[..., x, :][..., :, x]

@@ -25,7 +25,6 @@ def run(args):
 
     g = locals()[args.data](verbose=False)[0]
     g = dgl.remove_self_loop(g)
-    # g = dgl.add_self_loop(g)
 
     if "train_mask" not in g.ndata:
         g.ndata["train_mask"] = torch.zeros(g.number_of_nodes(), dtype=torch.bool)
@@ -52,7 +51,7 @@ def run(args):
         g.ndata["val_mask"][val_idxs] = True
         g.ndata["test_mask"][test_idxs] = True
 
-    from bklyn.models import ApproximatebklynModel
+    from bklyn.models import ApproximateBklynModel
     if torch.cuda.is_available():
         g = g.to("cuda:0")
 
@@ -62,9 +61,9 @@ def run(args):
         mixing_weights=None,
     )
 
-    inducing_points = torch.where(g.ndata["train_mask"])[0].float()
-    # inducing_points = g.nodes().float()
-    model = ApproximatebklynModel(
+    # inducing_points = torch.where(g.ndata["train_mask"])[0].float()
+    inducing_points = g.nodes().float()
+    model = ApproximateBklynModel(
         features=g.ndata["feat"],
         inducing_points=inducing_points,
         in_features=g.ndata["feat"].shape[-1],
@@ -73,7 +72,6 @@ def run(args):
         num_classes=g.ndata["label"].max()+1,
         t=args.t,
         gamma=args.gamma,
-        log_sigma=args.log_sigma,
         activation=getattr(torch.nn.functional, args.activation),
     )
 
@@ -81,7 +79,7 @@ def run(args):
         model = model.to("cuda:0")
         likelihood = likelihood.cuda()
 
-    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=g.ndata["train_mask"].sum())
+    mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=g.number_of_nodes())
     optimizer = getattr(
         torch.optim, args.optimizer
     )(
@@ -90,7 +88,8 @@ def run(args):
         weight_decay=args.weight_decay,
     )
     ngd = gpytorch.optim.NGD(
-        model.variational_parameters(), num_data=g.ndata["train_mask"].sum(),
+        model.variational_parameters(), 
+        num_data=g.number_of_nodes(),
         lr=0.1,
     )
 
@@ -106,13 +105,13 @@ def run(args):
         optimizer.step()
         ngd.step()
 
-    model.eval()
-    likelihood.eval()
-    with torch.no_grad(), gpytorch.settings.fast_pred_var():
-        y_hat = model(torch.where(g.ndata["val_mask"])[0]).mean
-        y = g.ndata["label"][g.ndata["val_mask"]]
-        accuracy = (y_hat.argmax(dim=-1) == y).float().mean().item()
-    print(accuracy)
+        model.eval()
+        likelihood.eval()
+        with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            y_hat = model(torch.where(g.ndata["val_mask"])[0]).mean
+            y = g.ndata["label"][g.ndata["val_mask"]]
+            accuracy = (y_hat.argmax(dim=-1) == y).float().mean().item()
+        print(accuracy)
     return accuracy
 
 if __name__ == "__main__":
@@ -121,13 +120,12 @@ if __name__ == "__main__":
     parser.add_argument("--data", type=str, default="CoraGraphDataset")
     parser.add_argument("--hidden_features", type=int, default=32)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--weight_decay", type=float, default=1e-5)
+    parser.add_argument("--weight_decay", type=float, default=1e-3)
     parser.add_argument("--optimizer", type=str, default="AdamW")
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--test", type=int, default=1)
-    parser.add_argument("--t", type=float, default=2.0)
+    parser.add_argument("--t", type=float, default=3.0)
     parser.add_argument("--gamma", type=float, default=-1.0)
-    parser.add_argument("--log_sigma", type=float, default=0.0)
     parser.add_argument("--activation", type=str, default="tanh")
     args = parser.parse_args()
     run(args)

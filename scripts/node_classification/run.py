@@ -52,7 +52,7 @@ def run(args):
         g.ndata["val_mask"][val_idxs] = True
         g.ndata["test_mask"][test_idxs] = True
 
-    from bklyn.models import ExactbklynModel
+    from bklyn.models import ExactBklynModel
     if torch.cuda.is_available():
         g = g.to("cuda:0")
 
@@ -61,7 +61,7 @@ def run(args):
         learn_additional_noise=True,
     )
 
-    model = ExactbklynModel(
+    model = ExactBklynModel(
         train_x=torch.where(g.ndata["train_mask"])[0],
         train_y=likelihood.transformed_targets,
         likelihood=likelihood,
@@ -71,7 +71,7 @@ def run(args):
         in_features=g.ndata["feat"].shape[-1],
         hidden_features=args.hidden_features,
         activation=getattr(torch.nn.functional, args.activation),
-        log_sigma=args.log_sigma,
+        gamma=args.gamma,
         t=args.t,
     )
 
@@ -112,13 +112,13 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, default="CoraGraphDataset")
-    parser.add_argument("--hidden_features", type=int, default=64)
+    parser.add_argument("--hidden_features", type=int, default=16)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--weight_decay", type=float, default=1e-5)
     parser.add_argument("--optimizer", type=str, default="RMSprop")
-    parser.add_argument("--n_epochs", type=int, default=50)
-    parser.add_argument("--activation", type=str, default="silu")
-    parser.add_argument("--log_sigma", type=float, default=0.0)
+    parser.add_argument("--n_epochs", type=int, default=100)
+    parser.add_argument("--activation", type=str, default="tanh")
+    parser.add_argument("--gamma", type=float, default=-1.0)
     parser.add_argument("--t", type=float, default=3.0)
     parser.add_argument("--test", type=int, default=1)
     args = parser.parse_args()
