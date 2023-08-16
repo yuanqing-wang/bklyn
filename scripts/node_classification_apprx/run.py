@@ -52,7 +52,7 @@ def run(args):
         g.ndata["val_mask"][val_idxs] = True
         g.ndata["test_mask"][test_idxs] = True
 
-    from bronx.models import ApproximateBronxModel
+    from bklyn.models import ApproximatebklynModel
     if torch.cuda.is_available():
         g = g.to("cuda:0")
 
@@ -64,7 +64,7 @@ def run(args):
 
     inducing_points = torch.where(g.ndata["train_mask"])[0].float()
     # inducing_points = g.nodes().float()
-    model = ApproximateBronxModel(
+    model = ApproximatebklynModel(
         features=g.ndata["feat"],
         inducing_points=inducing_points,
         in_features=g.ndata["feat"].shape[-1],

@@ -4,7 +4,7 @@ import pyro
 from pyro import poutine
 import dgl
 dgl.use_libxsmm(False)
-from bronx.models import GraphRegressionBronxModel
+from bklyn.models import GraphRegressionbklynModel
 
 def run(args):
     pyro.clear_param_store()
@@ -20,7 +20,7 @@ def run(args):
 
     g, y = next(iter(data_train))
 
-    model = GraphRegressionBronxModel(
+    model = GraphRegressionbklynModel(
         in_features=n_types,
         out_features=1,
         hidden_features=args.hidden_features,

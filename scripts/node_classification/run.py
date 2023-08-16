@@ -52,7 +52,7 @@ def run(args):
         g.ndata["val_mask"][val_idxs] = True
         g.ndata["test_mask"][test_idxs] = True
 
-    from bronx.models import ExactBronxModel
+    from bklyn.models import ExactbklynModel
     if torch.cuda.is_available():
         g = g.to("cuda:0")
 
@@ -61,7 +61,7 @@ def run(args):
         learn_additional_noise=True,
     )
 
-    model = ExactBronxModel(
+    model = ExactbklynModel(
         train_x=torch.where(g.ndata["train_mask"])[0],
         train_y=likelihood.transformed_targets,
         likelihood=likelihood,

@@ -116,7 +116,7 @@ def graph_exp(graph):
     a = torch.linalg.matrix_exp(a)
     return a
 
-class ExactBronxModel(ExactGP):
+class ExactBklynModel(ExactGP):
     def __init__(
             self, train_x, train_y, likelihood, num_classes, 
             features, graph, in_features, hidden_features, t, gamma, log_sigma,
@@ -157,7 +157,7 @@ class ExactBronxModel(ExactGP):
         covar = covar[..., x, :][..., :, x]
         return gpytorch.distributions.MultivariateNormal(mean, covar)
 
-class ApproximateBronxModel(ApproximateGP):
+class ApproximateBklynModel(ApproximateGP):
     def __init__(
             self,
             features,

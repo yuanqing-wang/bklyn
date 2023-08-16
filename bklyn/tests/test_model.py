@@ -6,8 +6,8 @@ def test_forward():
     import dgl
     g = dgl.rand_graph(5, 8)
     x = torch.zeros(5, 2)
-    from bronx.models import BronxModel
-    model = BronxModel(
+    from bklyn.models import bklynModel
+    model = bklynModel(
         inducing_points=x,
         inducing_indices=g.nodes(),
         graph=g,
