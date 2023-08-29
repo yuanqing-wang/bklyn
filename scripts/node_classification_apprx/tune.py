@@ -22,7 +22,6 @@ def experiment(args):
         "learning_rate": tune.loguniform(1e-4, 1e-1),
         "weight_decay": tune.loguniform(1e-10, 1e-2),
         "activation": tune.choice(["sigmoid", "tanh", "elu", "silu"]),
-        "log_sigma": tune.uniform(-5.0, 2.0),
         "t": tune.uniform(0.5, 2.0),
         "gamma": tune.uniform(-1.0, 1.0),
         "optimizer": tune.choice(["RMSprop", "Adam", "AdamW"]),

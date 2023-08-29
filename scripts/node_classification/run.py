@@ -71,7 +71,6 @@ def run(args):
         in_features=g.ndata["feat"].shape[-1],
         hidden_features=args.hidden_features,
         activation=getattr(torch.nn.functional, args.activation),
-        gamma=args.gamma,
         t=args.t,
     )
 
@@ -118,7 +117,6 @@ if __name__ == "__main__":
     parser.add_argument("--optimizer", type=str, default="RMSprop")
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--activation", type=str, default="tanh")
-    parser.add_argument("--gamma", type=float, default=-1.0)
     parser.add_argument("--t", type=float, default=3.0)
     parser.add_argument("--test", type=int, default=1)
     args = parser.parse_args()
