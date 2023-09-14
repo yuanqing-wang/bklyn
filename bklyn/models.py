@@ -190,6 +190,15 @@ class ApproximateBklynModel(ApproximateGP):
         )
 
         super().__init__(variational_strategy)
+        self.prior_mean_module = gpytorch.means.LinearMean(
+            hidden_features,
+            batch_shape=torch.Size((hidden_features,)),
+        )
+        self.prior_covar_module = gpytorch.kernels.ScaleKernel(
+            gpytorch.kernels.LinearKernel(),
+            batch_shape=torch.Size((hidden_features,)),
+        )
+
         self.mean_module = gpytorch.means.ZeroMean(
             batch_shape=torch.Size((num_classes,)),
         )
@@ -206,7 +215,12 @@ class ApproximateBklynModel(ApproximateGP):
 
     def forward(self, x):
         h = self.fc(self.features)
-        h = self.activation(h)
+        prior_mean = self.prior_mean_module(h)
+        prior_covar = self.prior_covar_module(h)
+        h = torch.distributions.Normal(prior_mean, prior_covar.sqrt()).rsample()
+        print(h.shape)
+
+
         h = self.dropout(h)
         mean = self.mean_module(h)
         h = self.rewire(h, self.graph)[-1]
