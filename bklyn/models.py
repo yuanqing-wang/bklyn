@@ -81,9 +81,7 @@ class Rewire(torch.nn.Module):
         q = self.fc_q(h)
         g.ndata["k"] = k
         g.ndata["q"] = q
-        g.apply_edges(dgl.function.u_dot_v("k", "q", "e+"))
-        g.apply_edges(dgl.function.u_dot_v("q", "k", "e-"))
-        g.edata["e"] = g.edata["e+"] + g.edata["e-"]
+        g.apply_edges(dgl.function.u_dot_v("k", "q", "e"))
         e = g.edata["e"] / k.shape[-1] ** 0.5
         e = edge_softmax(g, e)
 
@@ -190,14 +188,14 @@ class ApproximateBklynModel(ApproximateGP):
         )
 
         super().__init__(variational_strategy)
-        self.prior_mean_module = gpytorch.means.LinearMean(
-            hidden_features,
-            batch_shape=torch.Size((hidden_features,)),
-        )
-        self.prior_covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.LinearKernel(),
-            batch_shape=torch.Size((hidden_features,)),
-        )
+        # self.prior_mean_module = gpytorch.means.LinearMean(
+        #     hidden_features,
+        #     batch_shape=torch.Size((hidden_features,)),
+        # )
+        # self.prior_covar_module = gpytorch.kernels.ScaleKernel(
+        #     gpytorch.kernels.LinearKernel(),
+        #     batch_shape=torch.Size((hidden_features,)),
+        # )
 
         self.mean_module = gpytorch.means.ZeroMean(
             batch_shape=torch.Size((num_classes,)),
@@ -215,10 +213,9 @@ class ApproximateBklynModel(ApproximateGP):
 
     def forward(self, x):
         h = self.fc(self.features)
-        prior_mean = self.prior_mean_module(h)
-        prior_covar = self.prior_covar_module(h)
-        h = torch.distributions.Normal(prior_mean, prior_covar.sqrt()).rsample()
-        print(h.shape)
+        # prior_mean = self.prior_mean_module(h)
+        # prior_covar = self.prior_covar_module(h)
+        # h = torch.distributions.Normal(prior_mean, prior_covar.sqrt()).rsample()
 
 
         h = self.dropout(h)
