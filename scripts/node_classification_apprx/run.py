@@ -51,7 +51,7 @@ def run(args):
         g.ndata["val_mask"][val_idxs] = True
         g.ndata["test_mask"][test_idxs] = True
 
-    from bklyn.models import ApproximateBklynModel
+    from bklyn.models import BklynModel
     if torch.cuda.is_available():
         g = g.to("cuda:0")
 
@@ -63,15 +63,10 @@ def run(args):
 
     inducing_points = torch.where(g.ndata["train_mask"])[0].float()
     # inducing_points = g.nodes().float()
-    model = ApproximateBklynModel(
+    model = BklynModel(
         features=g.ndata["feat"],
-        inducing_points=inducing_points,
-        in_features=g.ndata["feat"].shape[-1],
         hidden_features=args.hidden_features,
-        graph=g,
-        num_classes=g.ndata["label"].max()+1,
-        t=args.t,
-        activation=getattr(torch.nn.functional, args.activation),
+        out_features=g.ndata["label"].max() + 1,
     )
 
     if torch.cuda.is_available():
@@ -79,6 +74,8 @@ def run(args):
         likelihood = likelihood.cuda()
 
     mll = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=g.ndata["train_mask"].sum())
+    mll = gpytorch.mlls.DeepApproximateMLL(mll)
+
     optimizer = getattr(
         torch.optim, args.optimizer
     )(
@@ -97,7 +94,7 @@ def run(args):
         likelihood.train()
         optimizer.zero_grad()
         ngd.zero_grad()
-        output = model(torch.where(g.ndata["train_mask"])[0])
+        output = model()
         loss = -mll(output, g.ndata["label"][g.ndata["train_mask"]])
         loss = loss.sum()
         loss.backward()
@@ -117,7 +114,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", type=str, default="CoraGraphDataset")
-    parser.add_argument("--hidden_features", type=int, default=32)
+    parser.add_argument("--hidden_features", type=int, default=8)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
     parser.add_argument("--weight_decay", type=float, default=1e-10)
     parser.add_argument("--optimizer", type=str, default="AdamW")

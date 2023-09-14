@@ -23,6 +23,8 @@ from gpytorch.kernels import (
 from .variational import GraphVariationalStrategy
 from dgl.nn.functional import edge_softmax
 from torchdiffeq import odeint_adjoint as odeint
+from gpytorch.models.deep_gps import DeepGPLayer, DeepGP
+
 # from torchdiffeq import odeint
 
 class ODEFunc(torch.nn.Module):
@@ -114,106 +116,57 @@ def graph_exp(graph):
     a = torch.linalg.matrix_exp(a)
     return a
 
-class ExactBklynModel(ExactGP):
-    def __init__(
-            self, train_x, train_y, likelihood, num_classes, 
-            features, graph, in_features, hidden_features, t,
-            activation, n=8,
-        ):
-        super().__init__(train_x, train_y, likelihood)
-
-        self.mean_module = gpytorch.means.ZeroMean(
-            batch_shape=torch.Size((num_classes,)),
-        )
-
-        self.covar_module = ScaleKernel(
-            LinearKernel(
-                batch_shape=torch.Size((num_classes,)),
-            ),
-            batch_shape=torch.Size((num_classes,)),
-        )
-
-        self.rewire = Rewire(
-            hidden_features, hidden_features, t=t, n=n,
-        )
-        self.likelihood = likelihood
-        self.num_classes = num_classes
-        self.register_buffer("features", features)
-        self.graph = graph
-        self.fc = torch.nn.Linear(in_features, hidden_features, bias=False)
-        # self.norm = torch.nn.LayerNorm(hidden_features, elementwise_affine=False)
-        self.activation = activation
-
-    def forward(self, x):
-        h = self.fc(self.features)
-        # h = self.norm(h)
-        h = self.activation(h)
-        mean = self.mean_module(h)
-        h = self.rewire(h, self.graph)
-        covar = self.covar_module(h).mean(0)
-        x = x.squeeze().long()
-        mean = mean[..., x]
-        covar = covar[..., x, :][..., :, x]
-        return gpytorch.distributions.MultivariateNormal(mean, covar)
-
-class ApproximateBklynModel(ApproximateGP):
+class EmbeddingLayer(DeepGPLayer):
     def __init__(
             self,
             features,
-            inducing_points,
-            graph: dgl.DGLGraph,
-            in_features: int,
-            hidden_features: int,
-            num_classes: int,
-            learn_inducing_locations: bool = False,
-            t: float=1.0,
-            activation: Callable=torch.nn.functional.silu,
-            n: int=8,
+            hidden_features,
+            out_features,
     ):
-
-        batch_shape = torch.Size([num_classes])
-        variational_distribution = TrilNaturalVariationalDistribution(
-            inducing_points.size(-1),
-            batch_shape=batch_shape,
+        variational_distribution = CholeskyVariationalDistribution(
+            num_inducing_points=features.shape[0],
+            # batch_shape=torch.Size([out_features]),
         )
 
         variational_strategy = VariationalStrategy(
             self,
-            inducing_points=inducing_points,
-            variational_distribution=variational_distribution,
-            learn_inducing_locations=learn_inducing_locations,
-        )
-        
-        variational_strategy = IndependentMultitaskVariationalStrategy(
-            variational_strategy, 
-            num_tasks=num_classes,
+            features,
+            variational_distribution,
+            learn_inducing_locations=False,
         )
 
-        super().__init__(variational_strategy)
-        self.mean_module = gpytorch.means.ZeroMean(
-            batch_shape=torch.Size((num_classes,)),
-        )
-        self.covar_module = LinearKernel()
-        self.rewire = Rewire(
-            hidden_features, hidden_features, t=t, n=n,
-        )
-        self.num_classes = num_classes
+        super().__init__(variational_strategy, features.shape[-1], out_features)
+        self.out_features = out_features
         self.register_buffer("features", features)
-        self.graph = graph
-        self.fc = torch.nn.Linear(in_features, hidden_features, bias=False)
-        self.activation = activation
-        self.dropout = torch.nn.Dropout(0.5)
+        self.fc = torch.nn.Linear(features.shape[-1], hidden_features)
+        self.mean_module = gpytorch.means.LinearMean(hidden_features)
+        self.covar_module = ScaleKernel(
+            RBFKernel(batch_shape=torch.Size([out_features]), ard_num_dims=hidden_features),
+            batch_shape=torch.Size([out_features]),
+        )
 
     def forward(self, x):
-        h = self.fc(self.features)
-        h = self.activation(h)
-        h = self.dropout(h)
-        mean = self.mean_module(h)
-        h = self.rewire(h, self.graph)[-1]
-        covar = self.covar_module(h)
-        x = x.squeeze().long()
-        mean = mean[..., x]
-        covar = covar[..., x, :][..., :, x]
+        x = self.fc(x)
+        mean = self.mean_module(x)
+        covar = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean, covar)
+
+    def __call__(self, *args, **kwargs):
+        x = self.features
+        return super().__call__(x, *args, **kwargs)
+
+
+
+
+class BklynModel(DeepGP):
+    def __init__(self, features, hidden_features, out_features):
+        super().__init__()
+        self.embedding_layer = EmbeddingLayer(features, hidden_features, out_features)
+
+    def forward(self):
+        x = self.embedding_layer()
+        return x
+    
+
 
     
