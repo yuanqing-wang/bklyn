@@ -83,9 +83,7 @@ class Rewire(torch.nn.Module):
         q = self.fc_q(h)
         g.ndata["k"] = k
         g.ndata["q"] = q
-        g.apply_edges(dgl.function.u_dot_v("k", "q", "e+"))
-        g.apply_edges(dgl.function.u_dot_v("q", "k", "e-"))
-        g.edata["e"] = g.edata["e+"] + g.edata["e-"]
+        g.apply_edges(dgl.function.u_dot_v("k", "q", "e"))
         e = g.edata["e"] / k.shape[-1] ** 0.5
         e = edge_softmax(g, e)
 
